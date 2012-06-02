@@ -1,15 +1,17 @@
 RM = /bin/rm
 CAT = /bin/cat
-CC = gcc
+# CC = gcc
+CC = clang
 
 CFLAGS = \
-    -g -W -Wall -ansi -pedantic -Wbad-function-cast -Wcast-align \
+    -g -W -Wall -pedantic -Wbad-function-cast -Wcast-align \
     -Wcast-qual -Wchar-subscripts -Winline \
     -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
     -Wredundant-decls -Wshadow -Wstrict-prototypes \
     -Wpointer-arith -Wno-long-long \
     -Wcomment -Wmissing-include-dirs \
-    -O -Wuninitialized
+    -O -Wuninitialized \
+    -D_FILE_OFFSET_BITS=64
 
 CPPFLAGS = \
 	-Iinclude/ \
@@ -22,7 +24,7 @@ OBJS  = \
 
 
 all: $(BIN)
-	$(BIN)
+#	$(BIN)
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(OBJS) $(LFLAGS)
