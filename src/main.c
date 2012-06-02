@@ -177,11 +177,7 @@ init_pattern(void) {
 int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
     int i;
 
-    printf("%s %d\n", pattern->name, pattern->len);
     for (i = 0; i < pattern->len; i++) {
-        printf("%x,%c,%d <-> %x,%c,%d\n", buf[i],  buf[i],  buf[i], pattern->pattern[i], pattern->pattern[i], pattern->pattern[i]);
-
-
         /* Ignore this byte */
         if (pattern->pattern[i] == (unsigned short) -1) {
             continue;
@@ -192,7 +188,6 @@ int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
             return 1;
         }
     }
-
     return 0;
 }
 
@@ -210,14 +205,11 @@ int siever(unsigned char const * const buf) {
     return 1;
 }
 
-
-
 int filters(void) {
     int i;
 
     for (i = 0; i < bufsize; i++) {
         if (siever(&(buffer[i])) == 0) {
-            printf("Match!\n");
             continue;
         }
     }
