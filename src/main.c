@@ -43,10 +43,6 @@ TAILQ_HEAD(, pattern_s) pattern_head;
 
 
 /* Prototypes */
-int init_pattern(void);
-int match_pattern(char const * const buf, struct pattern_s *pattern);
-int fill_buffer(OFF_T os);
-int doit(void);
 
 
 /* Variables */
@@ -70,6 +66,27 @@ init_pattern(void) {
 
     /* Initialize the tail queue. */
     TAILQ_INIT(&pattern_head);
+
+    /* JPG */
+    p = malloc(sizeof(struct pattern_s));
+    if (p == NULL) {
+        printf("Failed to allocate memory for a pattern\n");
+        return 1;
+    }
+    p->name        = "JPG";
+    p->len         = 11;
+    p->pattern[0]  = 0xFF;
+    p->pattern[1]  = 0xD8;
+    p->pattern[2]  = 0xFF;
+    p->pattern[3]  = 0xE0;
+    p->pattern[4]  = -1;
+    p->pattern[5]  = -1;
+    p->pattern[6]  = 0x4A;
+    p->pattern[7]  = 0x46;
+    p->pattern[8]  = 0x49;
+    p->pattern[9]  = 0x46;
+    p->pattern[10] = 0x00;
+    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
 
     /* JPG */
     p = malloc(sizeof(struct pattern_s));
@@ -150,16 +167,23 @@ init_pattern(void) {
     p->pattern[4]  = 'G';
     p->pattern[5]  = 'S';
     TAILQ_INSERT_TAIL(&pattern_head, p, entries);
+
+
+
     return 0;
 }
 
 
-int match_pattern(char const * const buf, struct pattern_s *pattern) {
+int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
     int i;
 
+    printf("%s %d\n", pattern->name, pattern->len);
     for (i = 0; i < pattern->len; i++) {
+        printf("%x,%c,%d <-> %x,%c,%d\n", buf[i],  buf[i],  buf[i], pattern->pattern[i], pattern->pattern[i], pattern->pattern[i]);
+
+
         /* Ignore this byte */
-        if (pattern->pattern[i] == -1) {
+        if (pattern->pattern[i] == (unsigned short) -1) {
             continue;
         }
 
@@ -172,7 +196,7 @@ int match_pattern(char const * const buf, struct pattern_s *pattern) {
     return 0;
 }
 
-int siever(char const * const buf) {
+int siever(unsigned char const * const buf) {
     struct pattern_s *p, *tmp_p;
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
