@@ -17,7 +17,7 @@ CPPFLAGS = \
 	-Iinclude/ \
 	-I. \
 
-BIN   =  ./bin/test
+BIN   =  ./bin/patternslider
 
 OBJS  = \
 	src/main.o
