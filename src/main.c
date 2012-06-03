@@ -47,7 +47,10 @@ TAILQ_HEAD(, pattern_s) pattern_head;
 
 /* Variables */
 #define BUFFER_SIZE 1000 * 1000 * 10
+char *dump_dir = NULL;
+int   longest_pattern = 0;
 int   fd     = -1;
+int   dump_num = 0;
 unsigned char *buffer = NULL;
 #ifndef HAVE_LSEEK64
 OFF_T offset = 0;
@@ -67,26 +70,21 @@ init_pattern(void) {
     /* Initialize the tail queue. */
     TAILQ_INIT(&pattern_head);
 
-    /* JPG */
+#if 0
+    /* HTTP */
     p = malloc(sizeof(struct pattern_s));
     if (p == NULL) {
         printf("Failed to allocate memory for a pattern\n");
         return 1;
     }
-    p->name        = "JPG";
-    p->len         = 11;
-    p->pattern[0]  = 0xFF;
-    p->pattern[1]  = 0xD8;
-    p->pattern[2]  = 0xFF;
-    p->pattern[3]  = 0xE0;
-    p->pattern[4]  = -1;
-    p->pattern[5]  = -1;
-    p->pattern[6]  = 0x4A;
-    p->pattern[7]  = 0x46;
-    p->pattern[8]  = 0x49;
-    p->pattern[9]  = 0x46;
-    p->pattern[10] = 0x00;
+    p->name        = "HTTP";
+    p->len         = 4;
+    p->pattern[0]  = 'H';
+    p->pattern[1]  = 'T';
+    p->pattern[2]  = 'T';
+    p->pattern[3]  = 'P';
     TAILQ_INSERT_TAIL(&pattern_head, p, entries);
+#endif
 
     /* JPG */
     p = malloc(sizeof(struct pattern_s));
@@ -169,10 +167,21 @@ init_pattern(void) {
     TAILQ_INSERT_TAIL(&pattern_head, p, entries);
 
 
-
     return 0;
 }
 
+int calc_longest_pattern(void) {
+    struct pattern_s *p, *tmp_p;
+    int longest = 0;
+
+    for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
+        if (longest < p->len) {
+            longest = p->len;
+        }
+        tmp_p = TAILQ_NEXT(p, entries);
+    }
+    return longest;
+}
 
 int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
     int i;
@@ -191,12 +200,37 @@ int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
     return 0;
 }
 
-int siever(unsigned char const * const buf) {
+void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len) {
+    OFF_T i;
+    int fd = -1;
+    char *dumpfile;
+
+    dumpfile = malloc(255);
+    if (!dumpfile) {
+        exit(1);
+    }
+
+    snprintf(dumpfile, 255, "%s%d.jpg", "/tmp/dump/dump", dump_num);
+    dump_num++;
+
+    fd = open(dumpfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
+    if (fd < 1) {
+        return;
+    }
+
+
+    write(fd, &(buf[os]), len);
+    free(dumpfile);
+    close(fd);
+}
+
+int siever(unsigned char const * const buf, OFF_T os) {
     struct pattern_s *p, *tmp_p;
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
         if (match_pattern(buf, p) == 0) {
             printf ("Found a match for pattern %s\n", p->name);
+            dump_buffer(buf, 0, 8192);
             return 0;
         }
         tmp_p = TAILQ_NEXT(p, entries);
@@ -206,10 +240,10 @@ int siever(unsigned char const * const buf) {
 }
 
 int filters(void) {
-    int i;
+    OFF_T i;
 
     for (i = 0; i < bufsize; i++) {
-        if (siever(&(buffer[i])) == 0) {
+        if (siever(&(buffer[i]), i) == 0) {
             continue;
         }
     }
@@ -221,8 +255,6 @@ int filters(void) {
 int fill_buffer(OFF_T os)
 {
     ssize_t cnt = 0;
-
-    OFF_T ret_os;
     os = LSEEK(fd, os, SEEK_SET);
 
     cnt = read(fd, buffer, bufsize);
@@ -249,7 +281,8 @@ int doit(void)
 
 
         /* Refill buffer */
-        offset += bufsize;
+        offset += bufsize; /* forward the file read-in by the size of the buffer */
+        offset -= longest_pattern; /* compensate for the size of the longest pattern to match on */
     }
     return 0;
 }
@@ -269,7 +302,9 @@ int main(int argc, char * argv[])
         printf("Problem initializing pattern list\n");
         return 1;
     }
+    longest_pattern = calc_longest_pattern();
 
+    /* dump_dir */
     if (argc == 1) {
         printf("No input file.\n");
         return 1;

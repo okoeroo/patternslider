@@ -6,7 +6,7 @@ CC = clang
 CFLAGS = \
     -g -W -Wall -pedantic -Wbad-function-cast -Wcast-align \
     -Wcast-qual -Wchar-subscripts -Winline \
-    -Wmissing-prototypes -Wnested-externs -Wpointer-arith \
+    -Wnested-externs -Wpointer-arith \
     -Wredundant-decls -Wshadow -Wstrict-prototypes \
     -Wpointer-arith -Wno-long-long \
     -Wcomment -Wmissing-include-dirs \
