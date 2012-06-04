@@ -73,7 +73,7 @@ unsigned char *buffer = NULL;
 #ifndef HAVE_LSEEK64
 OFF_T offset = 0;
 OFF_T endset = 0;
-OFF_T bufsize = 0;
+OFF_T bufsize = BUFFER_SIZE;
 #else
 OFF_T offset = 0;
 OFF_T endset = 0;
@@ -90,7 +90,7 @@ void add_pattern(const char * const line) {
     char hex[3];
     char *ret_p;
     long n;
-    off_t i;
+    size_t i;
     struct pattern_s *p;
     conf_section_t in_section = SECTION_NONE;
 
@@ -245,7 +245,6 @@ int init_patterns(char *conf) {
     off_t i, cnt, os, es, eol, bol;
     int fdc = -1;
     char *buf;
-    struct pattern_s *p;
 
     /* Initialize the tail queue. */
     TAILQ_INIT(&pattern_head);
@@ -537,20 +536,14 @@ int doit(void)
 }
 
 void usage(void) {
-    printf("patternslider -p <patterns> -d <dump dir> -i <input blob> -o <output file> [-h]\n");
+    printf("patternslider \\\n\t-m <buffer size: 100{,k,M,G,T,P,E,Z,Y}> \\\n\t-p <patterns> \\\n\t-d <dump dir> \\\n\t-i <input blob> \\\n\t-o <output file> \\\n\t[-h]\n");
 }
 
 int main(int argc, char * argv[])
 {
     int      i;
+    char *rest;
 
-    printf("Allocate buffer of 10M\n");
-    bufsize = BUFFER_SIZE;
-    buffer = malloc(bufsize);
-    if (buffer == NULL) {
-        printf("Could not allocate %lld\n", bufsize);
-        return 1;
-    }
     /* CLI arguments */
     for (i = 1; i < argc; i++) {
         if (strcmp("-h", argv[i]) == 0) {
@@ -567,6 +560,62 @@ int main(int argc, char * argv[])
                 exit(1);
             }
             dump_dir = argv[i+1];
+            i++;
+        } else if (strcmp("-m", argv[i]) == 0) {
+            if ((i + 1) >= argc) {
+                printf("Too few arguments\n");
+                usage();
+                exit(1);
+            }
+            if (argv[i+1][0] == '-') {
+                printf("Found a flag, size of memory: \"%s\"\n", argv[i+1]);
+                usage();
+                exit(1);
+            }
+            bufsize = strtol(argv[i+1], &rest, 10);
+            switch (rest[0]) {
+                case 'k' :
+                    bufsize *= 1000;
+                    break;
+                case 'M' :
+                    bufsize *= 1000 * 1000;
+                    break;
+                case 'G' :
+                    bufsize *= 1000 * 1000 * 1000;
+                    break;
+                case 'T' :
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    break;
+                case 'P' :
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000 * 1000;
+                    break;
+                case 'E' :
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    break;
+                case 'Z' :
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000 * 1000;
+                    printf("Warning: A Zetta byte does not fit in a 64 bit number.\n");
+                    break;
+                case 'Y' :
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    bufsize *= 1000 * 1000;
+                    printf("Warning: A Yotta byte does not fit in a 64 bit number.\n");
+                    break;
+                default :
+                    printf("Error: %c is not an SI metric prefix. Info: http://en.wikipedia.org/wiki/Metric_prefix\n", rest[0]);
+                    usage();
+                    exit(1);
+            }
+            printf("you specified the allocation of %llu bytes for the buffer\n", bufsize);
+            exit(1);
             i++;
         } else if (strcmp("-o", argv[i]) == 0) {
             if ((i + 1) >= argc) {
@@ -611,6 +660,14 @@ int main(int argc, char * argv[])
             printf("Error: Unknown option: \"%s\"\n", argv[i]);
             exit(1);
         }
+    }
+
+    /* allocate the buffer */
+    printf("Allocating buffer of %llu bytes\n", bufsize);
+    buffer = malloc(bufsize);
+    if (buffer == NULL) {
+        printf("Could not allocate %llu\n", bufsize);
+        return 1;
     }
 
     /* conf file read */
