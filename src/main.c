@@ -82,7 +82,10 @@ OFF_T bufsize = 0;
 
 /* functions */
 /*
-name:"JPG" extension:"jpg" pattern:hex:"FF A0 B0" end:hex:"FF 00"
+name:"JPG"              extension:"jpg" pattern:hex:"FF D8 FF E0 xx xx 4A 46 49 46 00"    end:hex:"FF D9"
+name:"JPG with EXIF"    extension:"jpg" pattern:hex:"FF D8 FF E1 xx xx 45 78 69 66 00"    end:hex:"FF D9"
+name:"JPG with EXIF 2"  extension:"jpg" pattern:hex:"FF D8 FF E1 FF xx xx 78 45 66 99"    end:hex:"FF D9"
+name:"JPG (IFF) "       extension:"jpg" pattern:hex:"FF D8 FF E8 xx xx 53 50 49 46 46 00" end:hex:"FF D9"
 */
 
 
@@ -152,7 +155,11 @@ void add_pattern(const char * const line) {
                 if (isblank(line[i])) {
                     continue; /* Skip byte on blank */
                 }
-                if (ishexnumber(line[i]) && ishexnumber(line[i+1])) {
+                if ((line[i] == 'x') && (line[i] == 'x')) {
+                    p->pattern[p->len] = -1;
+                    p->len++;
+                    i++;
+                } else if (ishexnumber(line[i]) && ishexnumber(line[i+1])) {
                     hex[0] = line[i];
                     hex[1] = line[i+1];
 
