@@ -31,7 +31,7 @@
 #endif
 
 #ifdef HAVE_LSEEK64
-    #define LSEEK lseek64
+    #define LSEEK LSEEK64
 #else
     #define LSEEK lseek
 #endif
@@ -73,7 +73,7 @@ unsigned char *buffer = NULL;
 #ifndef HAVE_LSEEK64
 OFF_T offset = 0;
 OFF_T endset = 0;
-OFF_T bufsize = BUFFER_SIZE;
+size_t bufsize = BUFFER_SIZE;
 #else
 OFF_T offset = 0;
 OFF_T endset = 0;
@@ -195,7 +195,7 @@ void add_pattern(const char * const line) {
     TAILQ_INSERT_TAIL(&pattern_head, p, entries);
 }
 
-void getaline(const char * const buf, off_t bol, off_t eol) {
+void getaline(const char * const buf, OFF_T bol, OFF_T eol) {
     char * line;
 
     line = malloc(eol - bol + 1);
@@ -242,7 +242,7 @@ void print_stored_patterns(void) {
 }
 
 int init_patterns(char *conf) {
-    off_t i, cnt, os, es, eol, bol;
+    OFF_T i, cnt, os, es, eol, bol;
     int fdc = -1;
     char *buf;
 
@@ -254,8 +254,8 @@ int init_patterns(char *conf) {
         return 1;
     }
     os = 0;
-    es = lseek(fdc, os, SEEK_END);
-    os = lseek(fdc, 0, SEEK_SET);
+    es = LSEEK(fdc, os, SEEK_END);
+    os = LSEEK(fdc, 0, SEEK_SET);
 
     buf = malloc(es);
     cnt = read(fdc, buf, es);
@@ -489,7 +489,7 @@ int siever(unsigned char const * const buf, OFF_T os) {
 }
 
 int filters(void) {
-    OFF_T i;
+    size_t i;
 
     for (i = 0; i < bufsize; i++) {
         if (siever(&(buffer[i]), i) == 0) {
@@ -614,8 +614,7 @@ int main(int argc, char * argv[])
                     usage();
                     exit(1);
             }
-            printf("you specified the allocation of %llu bytes for the buffer\n", bufsize);
-            exit(1);
+            printf("you specified the allocation of %lu bytes for the buffer\n", bufsize);
             i++;
         } else if (strcmp("-o", argv[i]) == 0) {
             if ((i + 1) >= argc) {
@@ -663,10 +662,10 @@ int main(int argc, char * argv[])
     }
 
     /* allocate the buffer */
-    printf("Allocating buffer of %llu bytes\n", bufsize);
+    printf("Allocating buffer of %lu bytes\n", bufsize);
     buffer = malloc(bufsize);
     if (buffer == NULL) {
-        printf("Could not allocate %llu\n", bufsize);
+        printf("Could not allocate %lu\n", bufsize);
         return 1;
     }
 
