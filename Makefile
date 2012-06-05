@@ -25,7 +25,7 @@ OBJS  = \
 
 
 all: $(BIN)
-	$(BIN) -p src/main.c -i ~/h10salauris.pcap -o /tmp/foo -d /tmp/dump_2 -m 1G
+	$(BIN) -p src/main.c -i ~/Documents/Virtual\ Machines/Windows\ XP/Windows\ XP.vmdk -o /tmp/foo -d /tmp/dump_2 -m 100M
 
 $(BIN): $(OBJS)
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ $(OBJS) $(LFLAGS)

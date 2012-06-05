@@ -1,3 +1,11 @@
+/*
+name:"JPG"              extension:"jpg" pattern:hex:"FF D8 FF E0 xx xx 4A 46 49 46 00"                end:hex:"FF D9"
+name:"JPG with EXIF"    extension:"jpg" pattern:hex:"FF D8 FF E1 xx xx 45 78 69 66 00"                end:hex:"FF D9"
+name:"JPG with EXIF 2"  extension:"jpg" pattern:hex:"FF D8 FF E1 FF xx xx 78 45 66 99"                end:hex:"FF D9"
+name:"JPG (IFF)"        extension:"jpg" pattern:hex:"FF D8 FF E8 xx xx 53 50 49 46 46 00"             end:hex:"FF D9"
+name:"PNG"              extension:"png" pattern:hex:"89 50 4E 47 0D 0A 1A 0A 00 00 00 0D 49 48 44 52" end:hex:"00 49 45 4E 44 AE 42 60 82"
+*/
+
 #include "main.h"
 
 #include <stdio.h>
@@ -61,7 +69,9 @@ TAILQ_HEAD(, pattern_s) pattern_head;
 
 
 /* Variables */
-#define BUFFER_SIZE 1000 * 1000 * 10
+#define BUFFER_SIZE         1000 * 1000 * 10
+#define DEFAULT_DUMP_SIZE   16000
+#define MAX_DUMP_SIZE       1000 * 1000 * 10
 char *dump_dir = NULL;
 char *input_file = NULL;
 char *output_file = NULL;
@@ -81,13 +91,6 @@ OFF_T bufsize = 0;
 #endif
 
 /* functions */
-/*
-name:"JPG"              extension:"jpg" pattern:hex:"FF D8 FF E0 xx xx 4A 46 49 46 00"    end:hex:"FF D9"
-name:"JPG with EXIF"    extension:"jpg" pattern:hex:"FF D8 FF E1 xx xx 45 78 69 66 00"    end:hex:"FF D9"
-name:"JPG with EXIF 2"  extension:"jpg" pattern:hex:"FF D8 FF E1 FF xx xx 78 45 66 99"    end:hex:"FF D9"
-name:"JPG (IFF) "       extension:"jpg" pattern:hex:"FF D8 FF E8 xx xx 53 50 49 46 46 00" end:hex:"FF D9"
-*/
-
 
 void add_pattern(const char * const line) {
     char hex[3];
@@ -214,7 +217,6 @@ void getaline(const char * const buf, OFF_T bol, OFF_T eol) {
     */
 
     if (strncmp(line, "name:", 5) == 0) {
-        printf("=============== %s\n", line);
         add_pattern(line);
     }
 
@@ -225,7 +227,7 @@ void print_stored_patterns(void) {
     int i;
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
-        printf("Pattern name:\"%s\"", p->name);
+        printf("== Pattern == name:\"%s\"", p->name);
         if (p->len_extension) {
             printf(" extension:\"%s\"", p->extension);
         }
@@ -440,17 +442,17 @@ int calc_longest_pattern(void) {
     return longest;
 }
 
-int match_pattern(unsigned char const * const buf, struct pattern_s *pattern) {
+int match_pattern(unsigned char const * const buf, unsigned short *pattern, int len) {
     int i;
 
-    for (i = 0; i < pattern->len; i++) {
+    for (i = 0; i < len; i++) {
         /* Ignore this byte */
-        if (pattern->pattern[i] == (unsigned short) -1) {
+        if (pattern[i] == (unsigned short) -1) {
             continue;
         }
 
         /* Match buffer with pattern */
-        if (buf[i] != pattern->pattern[i]) {
+        if (buf[i] != pattern[i]) {
             return 1;
         }
     }
@@ -480,13 +482,40 @@ void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len) {
     close(dump_fd);
 }
 
-int siever(unsigned char const * const buf, OFF_T os) {
+size_t sieve_end_pattern(unsigned char const * const buf, size_t os, struct pattern_s *p) {
+    size_t i;
+
+    for (i = 0; i < (bufsize - os); i++) {
+        if (match_pattern(&(buf[i]), p->end_pattern, p->end_len) == 0) {
+            return (i + p->end_len) < bufsize ? i + p->end_len : bufsize;
+        }
+    }
+    return 0;
+}
+
+int siever(unsigned char const * const buf, size_t os) {
     struct pattern_s *p, *tmp_p;
+    size_t ret;
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
-        if (match_pattern(buf, p) == 0) {
+        if (match_pattern(buf, p->pattern, p->len) == 0) {
             printf ("Found a match for pattern %s\n", p->name);
-            dump_buffer(buf, 0, 8192);
+            if (p->end_len) {
+                ret = sieve_end_pattern(buf, os, p);
+                if (ret == 0) {
+                    dump_buffer(buf, 0, DEFAULT_DUMP_SIZE);
+                    printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
+                } else {
+                    if (ret > MAX_DUMP_SIZE) {
+                        ret = MAX_DUMP_SIZE;
+                    }
+                    dump_buffer(buf, 0, ret);
+                    printf("size dumped: %d\n", ret);
+                }
+            } else {
+                dump_buffer(buf, 0, DEFAULT_DUMP_SIZE);
+                printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
+            }
             return 0;
         }
         tmp_p = TAILQ_NEXT(p, entries);
@@ -501,6 +530,9 @@ int filters(void) {
     for (i = 0; i < bufsize; i++) {
         if (siever(&(buffer[i]), i) == 0) {
             continue;
+        }
+        if (i % 100000 == 0) {
+            printf(".");
         }
     }
 
