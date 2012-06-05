@@ -21,6 +21,7 @@ name:"PNG"              extension:"png" pattern:hex:"89 50 4E 47 0D 0A 1A 0A 00 
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <errno.h>
+#include <sys/syslimits.h>
 
 #include <queue.h>
 
@@ -325,29 +326,29 @@ int match_pattern(unsigned char const * const buf, unsigned short *pattern, int 
 
 void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len, struct pattern_s *p) {
     int dump_fd = -1;
-    char *dumpfile;
+    char dumpfile[PATH_MAX];
+    OFF_T dump_size;
 
-    dumpfile = malloc(255);
-    if (!dumpfile) {
-        exit(1);
+    if (len > MAX_DUMP_SIZE) {
+        dump_size = MAX_DUMP_SIZE;
+    } else {
+        dump_size = len;
     }
 
-    snprintf(dumpfile, 255, "%s/%s_%8d.%s",
-                            dump_dir ? dump_dir : "/tmp/dump",
-                            DUMP_FILE_PREFIX,
-                            dump_num,
-                            p->len_extension ? p->extension : "jpg");
+    snprintf(dumpfile, PATH_MAX, "%s/%s_%08d.%s",
+                                dump_dir ? dump_dir : "/tmp/dump",
+                                DUMP_FILE_PREFIX,
+                                dump_num,
+                                p->len_extension ? p->extension : "jpg");
     dump_num++;
 
     dump_fd = open(dumpfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
     if (dump_fd < 1) {
         return;
     }
-
-
-    write(dump_fd, &(buf[os]), len);
-    free(dumpfile);
+    write(dump_fd, &(buf[os]), dump_size);
     close(dump_fd);
+    printf("Dumped file %s (size:%lld bytes, pattern:%s)\n", dumpfile, dump_size, p->name);
 }
 
 size_t sieve_end_pattern(unsigned char const * const buf, size_t os, struct pattern_s *p) {
@@ -367,22 +368,15 @@ int siever(unsigned char const * const buf, size_t os) {
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
         if (match_pattern(buf, p->pattern, p->len) == 0) {
-            printf ("Found a match for pattern %s\n", p->name);
             if (p->end_len) {
                 ret = sieve_end_pattern(buf, os, p);
                 if (ret == 0) {
                     dump_buffer(buf, 0, DEFAULT_DUMP_SIZE, p);
-                    printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
                 } else {
-                    if (ret > MAX_DUMP_SIZE) {
-                        ret = MAX_DUMP_SIZE;
-                    }
                     dump_buffer(buf, 0, ret, p);
-                    printf("size dumped: %lu\n", ret);
                 }
             } else {
                 dump_buffer(buf, 0, DEFAULT_DUMP_SIZE, p);
-                printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
             }
             return 0;
         }
@@ -401,6 +395,7 @@ int filters(void) {
         }
         if (i % 100000 == 0) {
             printf(".");
+            fflush(stdout);
         }
     }
 
