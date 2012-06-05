@@ -100,6 +100,8 @@ struct pattern_s {
     int             len;
     unsigned short  end_pattern[255];
     int             end_len;
+    size_t          min_bytes;
+    size_t          max_bytes;
     TAILQ_ENTRY(pattern_s) entries;
 };
 TAILQ_HEAD(, pattern_s) pattern_head;
@@ -113,6 +115,7 @@ TAILQ_HEAD(, pattern_s) pattern_head;
 #define DEFAULT_DUMP_SIZE   16000
 #define MAX_DUMP_SIZE       1000 * 1000 * 10
 #define DUMP_FILE_PREFIX    "dump"
+FILE * output_fh;
 char *dump_dir = NULL;
 char *input_file = NULL;
 char *output_file = NULL;
@@ -143,7 +146,7 @@ void add_pattern(const char * const line) {
 
     p = malloc(sizeof(struct pattern_s));
     if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
+        printf("Error: Failed to allocate memory for a pattern\n");
         exit(1);
     }
     memset(p, 0, sizeof(struct pattern_s));
@@ -153,34 +156,34 @@ void add_pattern(const char * const line) {
         if (strncmp(&(line[i]), "name:\"", 6) == 0) {
             i += 6;
             if (in_section != SECTION_NONE) {
-                printf("Parse error on line (missing closing tag): \"%s\"\n", line);
+                printf("Error: Parse error on line (missing closing tag): \"%s\"\n", line);
                 exit(1);
             }
             in_section = SECTION_NAME;
         } else if (strncmp(&(line[i]), "extension:\"", strlen("extension:\"")) == 0) {
             i += strlen("extension:\"");
             if (in_section != SECTION_NONE) {
-                printf("Parse error on line (missing closing tag): \"%s\"\n", line);
+                printf("Error: Parse error on line (missing closing tag): \"%s\"\n", line);
                 exit(1);
             }
             in_section = SECTION_EXTENSION;
         } else if (strncmp(&(line[i]), "pattern:hex:\"", 13) == 0) {
             i += 13;
             if (in_section != SECTION_NONE) {
-                printf("Parse error on line (missing closing tag): \"%s\"\n", line);
+                printf("Error: Parse error on line (missing closing tag): \"%s\"\n", line);
                 exit(1);
             }
             in_section = SECTION_PATTERN_HEX;
         } else if (strncmp(&(line[i]), "end:hex:\"", 9) == 0) {
             i += 9;
             if (in_section != SECTION_NONE) {
-                printf("Parse error on line (missing closing tag): \"%s\"\n", line);
+                printf("Error: Parse error on line (missing closing tag): \"%s\"\n", line);
                 exit(1);
             }
             in_section = SECTION_END_PATTERN_HEX;
         } else if (line[i] == '\"') {
             if (in_section == SECTION_NONE) {
-                printf("Parse error on line (a wild \" in the line): \"%s\"\n", line);
+                printf("Error: Parse error on line (a wild \" in the line): \"%s\"\n", line);
                 exit(1);
             }
             in_section = SECTION_NONE;
@@ -209,7 +212,7 @@ void add_pattern(const char * const line) {
 
                     n = strtoul(hex, &ret_p, 16);
                     if (*ret_p != 0 ) {
-                        printf("Not a Hex number: %s\n", hex);
+                        printf("Error: Not a Hex number: %s\n", hex);
                         exit(1);
                     }
                     p->pattern[p->len] = n;
@@ -230,7 +233,7 @@ void add_pattern(const char * const line) {
 
                     n = strtoul(hex, &ret_p, 16);
                     if (*ret_p != 0 ) {
-                        printf("Not a Hex number: %s\n", hex);
+                        printf("Error: Not a Hex number: %s\n", hex);
                         exit(1);
                     }
                     p->end_pattern[p->end_len] = n;
@@ -268,25 +271,28 @@ void print_stored_patterns(void) {
     int i;
 
     for (p = TAILQ_FIRST(&pattern_head); p != NULL; p = tmp_p) {
-        printf("== Pattern == name:\"%s\"", p->name);
+        fprintf(output_fh, "== Pattern == name:\"%s\"", p->name);
         if (p->len_extension) {
-            printf(" extension:\"%s\"", p->extension);
+            fprintf(output_fh, " extension:\"%s\"", p->extension);
         }
         if (p->len) {
-            printf(" pattern:\"");
+            fprintf(output_fh, " pattern:\"");
             for (i = 0; i < p->len; i++) {
-                printf("%x ", p->pattern[i]);
+                fprintf(output_fh, "%x ", p->pattern[i]);
             }
-            printf("\b\"");
+            fprintf(output_fh, "\b\"");
         }
         if (p->end_len) {
-            printf(" end pattern:\"");
+            fprintf(output_fh, " end pattern:\"");
             for (i = 0; i < p->end_len; i++) {
-                printf("%x ", p->end_pattern[i]);
+                fprintf(output_fh, "%x", p->end_pattern[i]);
+                if (i < p->end_len) {
+                    fprintf(output_fh, " ");
+                }
             }
-            printf("\b\"");
+            fprintf(output_fh, "\"");
         }
-        printf("\n");
+        fprintf(output_fh, "\n");
         tmp_p = TAILQ_NEXT(p, entries);
     }
 }
@@ -310,7 +316,7 @@ int init_patterns(char *conf) {
     buf = malloc(es);
     cnt = read(fdc, buf, es);
     if (cnt != es) {
-        printf("Failed to read config file.\n");
+        printf("Error: Failed to read config file.\n");
     }
     close(fdc);
 
@@ -385,7 +391,7 @@ void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len, struct pa
     }
     write(dump_fd, &(buf[os]), dump_size);
     close(dump_fd);
-    printf("Dumped file %s (size:%lld bytes, pattern:%s)\n", dumpfile, dump_size, p->name);
+    fprintf(output_fh, "Dumped file %s (size:%lld bytes, pattern:%s)\n", dumpfile, dump_size, p->name);
 }
 
 size_t sieve_end_pattern(unsigned char const * const buf, size_t os, struct pattern_s *p) {
@@ -610,6 +616,17 @@ int main(int argc, char * argv[])
         }
     }
 
+    /* Open output file, if configured */
+    if (output_file) {
+        output_fh = fopen(output_file, "a");
+        if (!output_fh) {
+            printf("Error: could not open outputfile \"%s\" for writing\n", output_file);
+            exit(1);
+        }
+    } else {
+        output_fh = stdout;
+    }
+
     /* Can I dump the files */
     if (check_dump_dir() != 0) {
         exit(1);
@@ -648,11 +665,12 @@ int main(int argc, char * argv[])
         return EXIT_CODE_BAD;
     }
 
+
     offset = 0;
     offset = LSEEK(fd, offset, SEEK_END);
     endset = offset;
     printf("File size is: %llu\n", endset);
-
+    fprintf(output_fh, "File size is: %llu\n", endset);
 
     /* Start analysis */
     doit();
