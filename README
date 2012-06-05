@@ -1,0 +1,32 @@
+Pattern slider
+==============
+
+Description
+------------
+Finds patterns in raw (disk) images.
+As example, use "-p src/main.c" as example pattern configuration file.
+
+Use it when your file system is completely borked or for forensic purposes.
+
+
+License
+-------
+CC:BY,NC
+License could be altered after contacting the author.
+
+
+Author
+------
+Oscar Koeroo <okoeroo@gmail.com>
+
+
+Usage
+-----
+patternslider \
+    -m <buffer size: 100{,k,M,G,T,P,E,Z,Y}> \
+    -p <patterns> \
+    -d <dump dir> \
+    -i <input blob> \
+    -o <output file> \
+    [-h]
+
