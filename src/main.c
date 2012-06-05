@@ -19,6 +19,8 @@ name:"PNG"              extension:"png" pattern:hex:"89 50 4E 47 0D 0A 1A 0A 00 
 #include <sys/uio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
 
 #include <queue.h>
 
@@ -72,6 +74,7 @@ TAILQ_HEAD(, pattern_s) pattern_head;
 #define BUFFER_SIZE         1000 * 1000 * 10
 #define DEFAULT_DUMP_SIZE   16000
 #define MAX_DUMP_SIZE       1000 * 1000 * 10
+#define DUMP_FILE_PREFIX    "dump"
 char *dump_dir = NULL;
 char *input_file = NULL;
 char *output_file = NULL;
@@ -290,145 +293,6 @@ int init_patterns(char *conf) {
     return 0;
 }
 
-#if 0
-int
-init_pattern(void) {
-    struct pattern_s *p;
-
-    /* Initialize the tail queue. */
-    TAILQ_INIT(&pattern_head);
-
-#if 0
-    /* HTTP */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    p->name        = "HTTP";
-    p->len         = 4;
-    p->pattern[0]  = 'H';
-    p->pattern[1]  = 'T';
-    p->pattern[2]  = 'T';
-    p->pattern[3]  = 'P';
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-#endif
-
-    /* JPG */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    memset(p, 0, sizeof(struct pattern_s));
-    p->name        = "JPG";
-    p->len         = 11;
-    p->pattern[0]  = 0xFF;
-    p->pattern[1]  = 0xD8;
-    p->pattern[2]  = 0xFF;
-    p->pattern[3]  = 0xE0;
-    p->pattern[4]  = -1;
-    p->pattern[5]  = -1;
-    p->pattern[6]  = 0x4A;
-    p->pattern[7]  = 0x46;
-    p->pattern[8]  = 0x49;
-    p->pattern[9]  = 0x46;
-    p->pattern[10] = 0x00;
-
-    p->end_len        = 2;
-    p->end_pattern[0] = 0xFF;
-    p->end_pattern[1] = 0xD9;
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-
-    /* JPG with EXIF */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    memset(p, 0, sizeof(struct pattern_s));
-    p->name        = "JPG with EXIF";
-    p->len         = 11;
-    p->pattern[0]  = 0xFF;
-    p->pattern[1]  = 0xD8;
-    p->pattern[2]  = 0xFF;
-    p->pattern[3]  = 0xE1;
-    p->pattern[4]  = -1;
-    p->pattern[5]  = -1;
-    p->pattern[6]  = 0x45;
-    p->pattern[7]  = 0x78;
-    p->pattern[8]  = 0x69;
-    p->pattern[9]  = 0x66;
-    p->pattern[10] = 0x00;
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-
-    /* JPG with EXIF_2 */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    memset(p, 0, sizeof(struct pattern_s));
-    p->name        = "JPG with EXIF_2";
-    p->len         = 11;
-    p->pattern[0]  = 0xFF;
-    p->pattern[1]  = 0xD8;
-    p->pattern[2]  = 0xFF;
-    p->pattern[3]  = 0xE1;
-    p->pattern[4]  = 0xFF;
-    p->pattern[5]  = -1;
-    p->pattern[6]  = -1;
-    p->pattern[7]  = 0x78;
-    p->pattern[8]  = 0x45;
-    p->pattern[9]  = 0x66;
-    p->pattern[10] = 0x99;
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-
-    /* JPG (IFF) */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    memset(p, 0, sizeof(struct pattern_s));
-    p->name        = "JPG (IFF)";
-    p->len         = 12;
-    p->pattern[0]  = 0xFF;
-    p->pattern[1]  = 0xD8;
-    p->pattern[2]  = 0xFF;
-    p->pattern[3]  = 0xE8;
-    p->pattern[4]  = -1;
-    p->pattern[5]  = -1;
-    p->pattern[6]  = 0x53;
-    p->pattern[7]  = 0x50;
-    p->pattern[8]  = 0x49;
-    p->pattern[9]  = 0x46;
-    p->pattern[10] = 0x46;
-    p->pattern[11] = 0x00;
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-
-    /* CFLAGS */
-    p = malloc(sizeof(struct pattern_s));
-    if (p == NULL) {
-        printf("Failed to allocate memory for a pattern\n");
-        return 1;
-    }
-    memset(p, 0, sizeof(struct pattern_s));
-    p->name        = "CFLAGS";
-    p->len         = 6;
-    p->pattern[0]  = 'C';
-    p->pattern[1]  = 'F';
-    p->pattern[2]  = 'L';
-    p->pattern[3]  = 'A';
-    p->pattern[4]  = 'G';
-    p->pattern[5]  = 'S';
-    TAILQ_INSERT_TAIL(&pattern_head, p, entries);
-
-
-    return 0;
-}
-#endif
-
 int calc_longest_pattern(void) {
     struct pattern_s *p, *tmp_p;
     int longest = 0;
@@ -459,7 +323,7 @@ int match_pattern(unsigned char const * const buf, unsigned short *pattern, int 
     return 0;
 }
 
-void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len) {
+void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len, struct pattern_s *p) {
     int dump_fd = -1;
     char *dumpfile;
 
@@ -468,7 +332,11 @@ void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len) {
         exit(1);
     }
 
-    snprintf(dumpfile, 255, "%s%d.jpg", "/tmp/dump/dump", dump_num);
+    snprintf(dumpfile, 255, "%s/%s_%8d.%s",
+                            dump_dir ? dump_dir : "/tmp/dump",
+                            DUMP_FILE_PREFIX,
+                            dump_num,
+                            p->len_extension ? p->extension : "jpg");
     dump_num++;
 
     dump_fd = open(dumpfile, O_CREAT|O_WRONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
@@ -503,17 +371,17 @@ int siever(unsigned char const * const buf, size_t os) {
             if (p->end_len) {
                 ret = sieve_end_pattern(buf, os, p);
                 if (ret == 0) {
-                    dump_buffer(buf, 0, DEFAULT_DUMP_SIZE);
+                    dump_buffer(buf, 0, DEFAULT_DUMP_SIZE, p);
                     printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
                 } else {
                     if (ret > MAX_DUMP_SIZE) {
                         ret = MAX_DUMP_SIZE;
                     }
-                    dump_buffer(buf, 0, ret);
-                    printf("size dumped: %d\n", ret);
+                    dump_buffer(buf, 0, ret, p);
+                    printf("size dumped: %lu\n", ret);
                 }
             } else {
-                dump_buffer(buf, 0, DEFAULT_DUMP_SIZE);
+                dump_buffer(buf, 0, DEFAULT_DUMP_SIZE, p);
                 printf("size dumped: %d\n", DEFAULT_DUMP_SIZE);
             }
             return 0;
@@ -570,6 +438,16 @@ int doit(void)
         /* Refill buffer */
         offset += bufsize; /* forward the file read-in by the size of the buffer */
         offset -= longest_pattern; /* compensate for the size of the longest pattern to match on */
+    }
+    return 0;
+}
+
+int check_dump_dir(void) {
+    struct stat s;
+
+    if (stat(dump_dir ? dump_dir : "/tmp/dump", &s) < 0) {
+        printf("Error: the dump directory \"%s\" is unreachable, reason: %s\n", dump_dir ? dump_dir : "/tmp/dump", strerror(errno));
+        return 1;
     }
     return 0;
 }
@@ -698,6 +576,11 @@ int main(int argc, char * argv[])
             printf("Error: Unknown option: \"%s\"\n", argv[i]);
             exit(1);
         }
+    }
+
+    /* Can I dump the files */
+    if (check_dump_dir() != 0) {
+        exit(1);
     }
 
     /* allocate the buffer */
