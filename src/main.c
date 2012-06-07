@@ -431,13 +431,29 @@ int siever(unsigned char const * const buf, size_t os) {
 
 int filters(void) {
     size_t i;
+    int rotor = 0;
 
     for (i = 0; i < bufsize; i++) {
         if (siever(&(buffer[i]), i) == 0) {
             continue;
         }
-        if (i % 100000 == 0) {
-            printf(".");
+        if (i % 1000000 == 0) {
+
+            switch(rotor++) {
+                case 0:
+                    printf("\b\\");
+                    break;
+                case 1:
+                    printf("\b|");
+                    break;
+                case 2:
+                    printf("\b/");
+                    break;
+                case 3:
+                    printf("\b-");
+                    rotor = 0;
+                    break;
+            }
             fflush(stdout);
         }
     }
@@ -462,6 +478,9 @@ int doit(void)
     /* Begin of file */
     offset = 0;
 
+    printf("\n");
+    fflush(stdout);
+
     while (offset < endset) {
         /* Fill buffer */
         if (fill_buffer(offset)) {
@@ -471,7 +490,6 @@ int doit(void)
 
         /* Run filters on buffer */
         filters();
-
 
         /* Refill buffer */
         offset += bufsize; /* forward the file read-in by the size of the buffer */
