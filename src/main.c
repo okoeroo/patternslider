@@ -79,7 +79,7 @@ name:"PGP Disk image"     extension:"pgd" pattern:hex:"50 47 50 64 4D 41 49 4E"
 #endif
 
 #ifdef HAVE_LSEEK64
-    #define LSEEK LSEEK64
+    #define LSEEK lseek64
 #else
     #define LSEEK lseek
 #endif
@@ -124,17 +124,29 @@ int   longest_pattern = 0;
 int   fd     = -1;
 int   dump_num = 0;
 unsigned char *buffer = NULL;
-#ifndef HAVE_LSEEK64
 OFF_T offset = 0;
 OFF_T endset = 0;
 size_t bufsize = BUFFER_SIZE;
-#else
-OFF_T offset = 0;
-OFF_T endset = 0;
-OFF_T bufsize = 0;
-#endif
 
 /* functions */
+
+void update_info(void) {
+    float x;
+    float a;
+    float b;
+
+    a = offset;
+    b = endset;
+    x = a / b * 100;
+
+    fprintf(stdout, "\r");
+    fprintf(stdout, "File size: %llu, buffer size: %lu, current offset: %llu, percentage read: %f%% ",
+        endset,
+        bufsize,
+        offset,
+        x);
+}
+
 
 void add_pattern(const char * const line) {
     char hex[3];
@@ -392,6 +404,7 @@ void dump_buffer(unsigned char const * const buf, OFF_T os, OFF_T len, struct pa
     write(dump_fd, &(buf[os]), dump_size);
     close(dump_fd);
     fprintf(output_fh, "Dumped file %s (size:%lld bytes, pattern:%s)\n", dumpfile, dump_size, p->name);
+    fflush(output_fh);
 }
 
 size_t sieve_end_pattern(unsigned char const * const buf, size_t os, struct pattern_s *p) {
@@ -441,16 +454,16 @@ int filters(void) {
 
             switch(rotor++) {
                 case 0:
-                    printf("\b\\");
+                    printf("\b\b \\");
                     break;
                 case 1:
-                    printf("\b|");
+                    printf("\b\b |");
                     break;
                 case 2:
-                    printf("\b/");
+                    printf("\b\b /");
                     break;
                 case 3:
-                    printf("\b-");
+                    printf("\b\b -");
                     rotor = 0;
                     break;
             }
@@ -467,8 +480,7 @@ int fill_buffer(OFF_T os)
     os = LSEEK(fd, os, SEEK_SET);
 
     cnt = read(fd, buffer, bufsize);
-    printf ("Read %ld bytes into buffer.\n", cnt);
-    /* display buffer */
+    fprintf (output_fh, "Read %ld bytes into buffer.\n", cnt);
 
     return 0;
 }
@@ -487,6 +499,9 @@ int doit(void)
             printf("Something went wrong at offset: %lld\n", offset);
             return 1;
         }
+
+        /* Status line print */
+        update_info();
 
         /* Run filters on buffer */
         filters();
@@ -695,5 +710,6 @@ int main(int argc, char * argv[])
 
     close(fd);
 
+    printf("\n");
     return EXIT_CODE_GOOD;
 }
