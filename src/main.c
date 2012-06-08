@@ -140,7 +140,7 @@ void update_info(void) {
     x = a / b * 100;
 
     fprintf(stdout, "\r");
-    fprintf(stdout, "File size: %llu, buffer size: %lu, current offset: %llu, percentage read: %f%% ",
+    fprintf(stdout, "File size: %llu, buffer size: %lu, current offset: %llu, percentage read: %.3f % \% %% ",
         endset,
         bufsize,
         offset,
