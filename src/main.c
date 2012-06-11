@@ -14,7 +14,7 @@ name:"QuickTime movie file" extension:"mov" pattern:hex:"00 00 00 14 66 74 79 70
 name:"MPEG-4 video"     extension:"mp4" pattern:hex:"00 00 00 18 66 74 79 70 33 67 70 35"
 name:"MPEG-4 video/QuickTime"     extension:"m4v" pattern:hex:"00 00 00 18 66 74 79 70 6D 70 34 32"
 name:"Apple Lossless Audio Codec"     extension:"m4a" pattern:hex:"00 00 00 20 66 74 79 70 4D 34 41 20"
-name:"DVD MPEG2"     extension:"vob" pattern:hex:"00 00 01 BA"
+#name:"DVD MPEG2"     extension:"vob" pattern:hex:"00 00 01 BA"
 name:"Matroska"     extension:"mkv" pattern:hex:"1A 45 DF A3 93 42 82 88 6D 61 74 72 6F 73 6B 61"
 name:"RealAudio"     extension:"ra" pattern:hex:"2E 72 61 FD 00"
 name:"MS Money"     extension:"mny" pattern:hex:"00 01 00 00 4D 53 49 53 41 4D 20 44 61 74 61 62 61 73 65"
@@ -487,9 +487,6 @@ int fill_buffer(OFF_T os)
 
 int doit(void)
 {
-    /* Begin of file */
-    offset = 0;
-
     printf("\n");
     fflush(stdout);
 
@@ -524,13 +521,19 @@ int check_dump_dir(void) {
 }
 
 void usage(void) {
-    printf("patternslider \\\n\t-m <buffer size: 100{,k,M,G,T,P,E,Z,Y}> \\\n\t-p <patterns> \\\n\t-d <dump dir> \\\n\t-i <input blob> \\\n\t-o <output file> \\\n\t[-h]\n");
+    printf("patternslider \\\n\t-m <buffer size: 100{,k,M,G,T,P,E,Z,Y}> \\\n\t-p <patterns> \\\n\t-d <dump dir> \\\n\t-i <input blob> \\\n\t-offset <offset absolute or percentage> \\\n\t-o <output file> \\\n\t[-h]\n");
 }
 
 int main(int argc, char * argv[])
 {
     int      i;
     char *rest;
+    long long retll = 0;
+    short percentage = 0;
+
+    float x;
+    float a;
+    float b;
 
     /* CLI arguments */
     for (i = 1; i < argc; i++) {
@@ -549,6 +552,29 @@ int main(int argc, char * argv[])
             }
             dump_dir = argv[i+1];
             i++;
+        } else if (strcmp("-offset", argv[i]) == 0) {
+            if ((i + 1) >= argc) {
+                printf("Too few arguments\n");
+                usage();
+                exit(1);
+            }
+            if (argv[i+1][0] == '-') {
+                printf("Found a flag, not a directory: \"%s\"\n", argv[i+1]);
+                usage();
+                exit(1);
+            }
+            if (strstr(argv[i+1], "%") == NULL) {
+                /* Absolute offset */
+                rest = NULL;
+                retll = strtoll(argv[i+1], &rest, 10);
+                percentage = 0;
+            } else {
+                /* Percentage */
+                rest = NULL;
+                retll = strtoll(argv[i+1], &rest, 10);
+                percentage = 1;
+            }
+            i++;
         } else if (strcmp("-m", argv[i]) == 0) {
             if ((i + 1) >= argc) {
                 printf("Too few arguments\n");
@@ -560,6 +586,7 @@ int main(int argc, char * argv[])
                 usage();
                 exit(1);
             }
+            rest = NULL;
             bufsize = strtol(argv[i+1], &rest, 10);
             switch (rest[0]) {
                 case 'k' :
@@ -704,6 +731,20 @@ int main(int argc, char * argv[])
     endset = offset;
     printf("File size is: %llu\n", endset);
     fprintf(output_fh, "File size is: %llu\n", endset);
+
+    /* Begin of file */
+    offset = 0;
+    if (percentage == 0) {
+        offset = retll;
+    } else {
+        a = retll;
+        b = endset;
+        x = a / 100 * b;
+        offset = x;
+    }
+
+    printf("Offset to start from is: %llu / %llu\n", offset, endset);
+    fprintf(output_fh, "Offset to start from is: %llu / %llu\n", offset, endset);
 
     /* Start analysis */
     doit();
